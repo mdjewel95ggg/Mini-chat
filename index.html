@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mini Chat</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col justify-between">
+
+    <div class="max-w-md mx-auto w-full p-4 flex flex-col h-screen justify-between">
+        <header class="py-4 border-b border-slate-800 flex justify-between items-center">
+            <h1 class="text-xl font-bold text-teal-400">Mini Chat</h1>
+            <div id="user-info" class="text-sm text-slate-400"></div>
+        </header>
+
+        <main id="main-content" class="flex-1 overflow-y-auto py-4 flex flex-col justify-center">
+            <div id="auth-box" class="bg-slate-800 p-6 rounded-xl shadow-lg border border-slate-700 w-full max-w-sm mx-auto">
+                <h2 id="form-title" class="text-2xl font-bold mb-6 text-center text-teal-400">Log In</h2>
+                <form id="auth-form" class="space-y-4">
+                    <div>
+                        <label class="block text-sm text-slate-400 mb-1">Email</label>
+                        <input type="email" id="email" required placeholder="user@example.com" class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-teal-400">
+                    </div>
+                    <div>
+                        <label class="block text-sm text-slate-400 mb-1">Password</label>
+                        <input type="password" id="password" required placeholder="********" class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-teal-400">
+                    </div>
+                    <button type="submit" id="submit-btn" class="w-full py-2 bg-teal-500 text-slate-950 font-bold rounded-lg hover:bg-teal-400 transition">Log In</button>
+                </form>
+                <p class="mt-4 text-center text-sm text-slate-400">
+                    <span id="toggle-text">Don't have an account?</span> 
+                    <button id="toggle-auth" type="button" class="text-teal-400 underline ml-1 font-semibold">Sign Up</button>
+                </p>
+            </div>
+            
+            <div id="chat-box" class="hidden flex flex-col h-full justify-between">
+                <div id="chat-messages" class="flex-1 overflow-y-auto space-y-3 pr-2 mb-4"></div>
+                <form id="chat-form" class="flex gap-2">
+                    <input type="text" id="message-input" required placeholder="Type a message..." class="flex-1 px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-teal-400">
+                    <button type="submit" class="px-4 py-2 bg-teal-500 text-slate-950 font-bold rounded-lg hover:bg-teal-400">Send</button>
+                </form>
+            </div>
+        </main>
+    </div>
+
+    <!-- Firebase SDK Compat -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+
+    <script>
+        const firebaseConfig = {
+          apiKey: "AIzaSyBSHMD4A71T1ViKgWNs0nWwMd_thlxGunc",
+          authDomain: "mini-chat-cbb9b.firebaseapp.com",
+          projectId: "mini-chat-cbb9b",
+          storageBucket: "mini-chat-cbb9b.firebasestorage.app",
+          messagingSenderId: "255685220982",
+          appId: "1:255685220982:web:5a446dfdb4e22583475d57",
+          measurementId: "G-DHJ0C9S4ES"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+
+        let isLogin = true;
+        const authBox = document.getElementById('auth-box');
+        const chatBox = document.getElementById('chat-box');
+        const authForm = document.getElementById('auth-form');
+        const formTitle = document.getElementById('form-title');
+        const submitBtn = document.getElementById('submit-btn');
+        const toggleAuth = document.getElementById('toggle-auth');
+        const toggleText = document.getElementById('toggle-text');
+        const userInfo = document.getElementById('user-info');
+        const chatForm = document.getElementById('chat-form');
+        const messageInput = document.getElementById('message-input');
+        const chatMessages = document.getElementById('chat-messages');
+
+        toggleAuth.addEventListener('click', () => {
+            isLogin = !isLogin;
+            formTitle.textContent = isLogin ? 'Log In' : 'Create Account';
+            submitBtn.textContent = isLogin ? 'Log In' : 'Sign Up';
+            toggleText.textContent = isLogin ? "Don't have an account?" : "Already registered?";
+            toggleAuth.textContent = isLogin ? 'Sign Up' : 'Log In';
+        });
+
+        authForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+
+            if (isLogin) {
+                auth.signInWithEmailAndPassword(email, password).catch(err => alert(err.message));
+            } else {
+                auth.createUserWithEmailAndPassword(email, password).catch(err => alert(err.message));
+            }
+        });
+
+        auth.onAuthStateChanged(user => {
+            if (user) {
+                authBox.classList.add('hidden');
+                chatBox.classList.remove('hidden');
+                userInfo.innerHTML = `<span class="mr-2 text-xs">${user.email}</span> <button id="logout" class="text-red-400 text-xs font-bold underline">Logout</button>`;
+                document.getElementById('logout').onclick = () => auth.signOut();
+                
+                db.collection('messages').orderBy('createdAt', 'asc').onSnapshot(snap => {
+                    chatMessages.innerHTML = '';
+                    snap.forEach(doc => {
+                        const d = doc.data();
+                        const isMe = d.sender === user.email;
+                        chatMessages.innerHTML += `<div class="flex flex-col ${isMe ? 'items-end' : 'items-start'}"><div class="max-w-xs px-4 py-2 rounded-lg text-sm ${isMe ? 'bg-teal-600 text-white' : 'bg-slate-800 text-slate-200'}"><span class="block text-[10px] text-slate-400 mb-0.5">${d.sender}</span>${d.text}</div></div>`;
+                    });
+                    chatMessages.scrollTop = chatMessages.scrollHeight;
+                });
+            } else {
+                chatBox.classList.add('hidden');
+                authBox.classList.remove('hidden');
+                userInfo.innerHTML = '';
+            }
+        });
+
+        chatForm.addEventListener('submit', e => {
+            e.preventDefault();
+            const text = messageInput.value.trim();
+            if(!text) return;
+            db.collection('messages').add({
+                text: text,
+                sender: auth.currentUser.email,
+                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            }).then(() => messageInput.value = '');
+        });
+    </script>
+</body>
+</html>
