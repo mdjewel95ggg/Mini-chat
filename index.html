@@ -306,17 +306,52 @@ $("#f-msg").addEventListener("submit", async e => {
 });
 
 // Search users to start chat
+// Search users to start chat easily
 $("#q").addEventListener("input", async e => {
   const val = normU(e.target.value);
-  if (val.length < 2) return;
-  const qRef = query(collection(db, "users"), where("username", ">=", val), where("username", "<=", val + "\uf8ff"), limit(5));
-  const snap = await getDocs(qRef);
-  snap.forEach(d => {
-    const u = d.data();
-    if (u.uid === me.uid) return;
-    // Check if conversation already exists, else create
-    // simplified for brevity
-  });
+  const listEl = $("#list");
+  if (val.length < 2) { renderList(); return; }
+  
+  try {
+    const qRef = query(collection(db, "users"), limit(20));
+    const snap = await getDocs(qRef);
+    listEl.innerHTML = "";
+    
+    let found = false;
+    snap.forEach(d => {
+      const u = d.data();
+      if (u.uid === me.uid) return;
+      if (u.username.includes(val) || u.fullName.toLowerCase().includes(val)) {
+        found = true;
+        const el = document.createElement("button");
+        el.className = "conv";
+        el.innerHTML = `${av(u.fullName, u.photoURL)}<div class="ci"><div class="r1"><b>${esc(u.fullName)}</b></div><div class="r2"><span>@${esc(u.username)}</span></div></div>`;
+        el.onclick = async () => {
+          const existing = Array.from(convs.values()).find(c => c.type !== "group" && c.participants.includes(u.uid));
+          if (existing) {
+            openChat(existing.id);
+          } else {
+            const newRef = doc(collection(db, "conversations"));
+            await setDoc(newRef, {
+              type: "direct",
+              participants: [me.uid, u.uid],
+              updatedAt: serverTimestamp(),
+              lastMessage: "Started a chat"
+            });
+            openChat(newRef.id);
+          }
+        };
+        listEl.appendChild(el);
+      }
+    });
+    if (!found) {
+      listEl.innerHTML = `<div class="emp">No user found with "${esc(val)}"</div>`;
+    }
+  } catch (err) {
+    console.error(err);
+  }
+});
+     
 });
 </script>
 </body>
