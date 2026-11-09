@@ -306,15 +306,19 @@ $("#f-msg").addEventListener("submit", async e => {
 });
 
 // Search users to start chat
-// Search users to start chat easily
-
-// Search users to start chat easily
+// Search users safely
 $("#q").addEventListener("input", async e => {
-  const val = normU(e.target.value);
+  const val = e.target.value.trim().toLowerCase();
   const listEl = $("#list");
-  if (val.length < 2) { renderList(); return; }
+  if (!listEl) return;
+  
+  if (val.length < 2) {
+    if (typeof renderList === 'function') renderList();
+    return;
+  }
   
   try {
+    listEl.innerHTML = `<div class="emp">Searching...</div>`;
     const qRef = query(collection(db, "users"), limit(20));
     const snap = await getDocs(qRef);
     listEl.innerHTML = "";
@@ -322,25 +326,33 @@ $("#q").addEventListener("input", async e => {
     let found = false;
     snap.forEach(d => {
       const u = d.data();
-      if (u.uid === me.uid) return;
-      if (u.username.includes(val) || (u.fullName && u.fullName.toLowerCase().includes(val))) {
+      if (me && u.uid === me.uid) return;
+      
+      const uname = (u.username || "").toLowerCase();
+      const fname = (u.fullName || "").toLowerCase();
+      
+      if (uname.includes(val) || fname.includes(val)) {
         found = true;
         const el = document.createElement("button");
         el.className = "conv";
-        el.innerHTML = `${av(u.fullName, u.photoURL)}<div class="ci"><div class="r1"><b>${esc(u.fullName)}</b></div><div class="r2"><span>@${esc(u.username)}</span></div></div>`;
+        el.innerHTML = `<div class="ci"><div class="r1"><b>${u.fullName || u.username}</b></div><div class="r2"><span>@${u.username}</span></div></div>`;
         el.onclick = async () => {
-          const existing = Array.from(convs.values()).find(c => c.type !== "group" && c.participants.includes(u.uid));
-          if (existing) {
-            openChat(existing.id);
-          } else {
-            const newRef = doc(collection(db, "conversations"));
-            await setDoc(newRef, {
-              type: "direct",
-              participants: [me.uid, u.uid],
-              updatedAt: serverTimestamp(),
-              lastMessage: "Started a chat"
-            });
-            openChat(newRef.id);
+          try {
+            const existing = Array.from(convs.values()).find(c => c.type !== "group" && c.participants && c.participants.includes(u.uid));
+            if (existing) {
+              openChat(existing.id);
+            } else {
+              const newRef = doc(collection(db, "conversations"));
+              await setDoc(newRef, {
+                type: "direct",
+                participants: [me.uid, u.uid],
+                updatedAt: serverTimestamp(),
+                lastMessage: "Started a chat"
+              });
+              openChat(newRef.id);
+            }
+          } catch (err) {
+            console.error("Chat open error:", err);
           }
         };
         listEl.appendChild(el);
@@ -348,10 +360,11 @@ $("#q").addEventListener("input", async e => {
     });
     
     if (!found) {
-      listEl.innerHTML = `<div class="emp">No user found with "${esc(val)}"</div>`;
+      listEl.innerHTML = `<div class="emp">No user found</div>`;
     }
   } catch (err) {
-    console.error(err);
+    console.error("Search error:", err);
+    listEl.innerHTML = `<div class="emp">Connection error</div>`;
   }
 });
  
