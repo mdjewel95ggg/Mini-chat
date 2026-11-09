@@ -307,6 +307,8 @@ $("#f-msg").addEventListener("submit", async e => {
 
 // Search users to start chat
 // Search users to start chat easily
+
+// Search users to start chat easily
 $("#q").addEventListener("input", async e => {
   const val = normU(e.target.value);
   const listEl = $("#list");
@@ -321,7 +323,7 @@ $("#q").addEventListener("input", async e => {
     snap.forEach(d => {
       const u = d.data();
       if (u.uid === me.uid) return;
-      if (u.username.includes(val) || u.fullName.toLowerCase().includes(val)) {
+      if (u.username.includes(val) || (u.fullName && u.fullName.toLowerCase().includes(val))) {
         found = true;
         const el = document.createElement("button");
         el.className = "conv";
@@ -344,6 +346,7 @@ $("#q").addEventListener("input", async e => {
         listEl.appendChild(el);
       }
     });
+    
     if (!found) {
       listEl.innerHTML = `<div class="emp">No user found with "${esc(val)}"</div>`;
     }
@@ -351,8 +354,4 @@ $("#q").addEventListener("input", async e => {
     console.error(err);
   }
 });
-     
-});
-</script>
-</body>
-</html>
+ 
